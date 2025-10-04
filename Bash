@@ -1,470 +1,98 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-ROOT_DIR="SoccerMatchPredictor"
-ZIP_NAME="${ROOT_DIR}.zip"
-
-if [ -d "$ROOT_DIR" ]; then
-  echo "Error: directory '$ROOT_DIR' already exists. Remove it or choose a different location." >&2
-  exit 1
-fi
-
-mkdir "$ROOT_DIR"
-cd "$ROOT_DIR"
-
-# create folders
-mkdir -p client/public client/src/components server .github/workflows
-
-# Root README
-cat > README.md <<'EOF'
-# SoccerMatchPredictor
-
-Starter web app that predicts soccer matches for the upcoming 7 days. React frontend displays match cards with team logos and an Express backend exposes a predictions API.
-
-## Setup (local)
-1. From project root:
-   - Start backend:
-     - cd server
-     - npm install
-     - npm start
-     Backend runs on http://localhost:4000
-
-   - Start frontend:
-     - cd ../client
-     - npm install
-     - npm start
-     Frontend runs on http://localhost:3000
-
-## Deploy frontend to GitHub Pages (Actions)
-- Replace <your-github-username> in client/package.json with your GitHub username.
-- Push to GitHub main branch. The included GitHub Actions workflow will build the client and publish to the gh-pages branch.
-- Optionally set repository secret REACT_APP_API_URL when you later deploy the backend.
-
-EOF
-
-# server/package.json
-cat > server/package.json <<'JSON'
-{
-  "name": "soccer-predictor-server",
-  "version": "1.0.0",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.18.2"
-  }
-}
-JSON
-
-# server/server.js
-cat > server/server.js <<'JS'
-const express = require('express');
-const cors = require('cors');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-const PORT = process.env.PORT || 4000;
-
-function getUpcomingFixtures() {
-  const today = new Date();
-  const fixtures = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const iso = d.toISOString().split('T')[0];
-    fixtures.push({
-      id: `match-${i+1}`,
-      date: iso,
-      home: { name: `Home FC ${i+1}`, logo: `https://via.placeholder.com/64?text=H${i+1}` },
-      away: { name: `Away FC ${i+1}`, logo: `https://via.placeholder.com/64?text=A${i+1}` }
-    });
-  }
-  return fixtures;
-}
-
-function predictOutcome(homeRating = 1000, awayRating = 1000) {
-  const expectedHome = 1 / (1 + Math.pow(10, (awayRating - homeRating) / 400));
-  if (expectedHome > 0.57) return { prediction: 'Home Win', confidence: Math.round(expectedHome * 100) };
-  if (expectedHome < 0.43) return { prediction: 'Away Win', confidence: Math.round((1 - expectedHome) * 100) };
-  return { prediction: 'Draw', confidence: Math.round((1 - Math.abs(expectedHome - 0.5)) * 100) };
-}
-
-app.get('/api/predictions', (req, res) => {
-  const fixtures = getUpcomingFixtures();
-  const predictions = fixtures.map((m, idx) => {
-    const homeRating = 1000 + (idx % 5) * 10;
-    const awayRating = 1000 + ((idx + 2) % 5) * 8;
-    const result = predictOutcome(homeRating, awayRating);
-    return {
-      id: m.id,
-      date: m.date,
-      home: m.home,
-      away: m.away,
-      prediction: result.prediction,
-      confidence: result.confidence
-    };
-  });
-  res.json({ predictions });
-});
-
-app.listen(PORT, () => {
-  console.log(`Predictions API listening on port ${PORT}`);
-});
-JS
-
-# client/package.json
-cat > client/package.json <<'JSON'
-{
-  "name": "soccer-predictor-client",
-  "version": "1.0.0",
-  "private": true,
-  "homepage": "https://<your-github-username>.github.io/SoccerMatchPredictor",
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build"
-  }
-}
-JSON
-
-# client/public/index.html
-cat > client/public/index.html <<'HTML'
 <!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Soccer Match Predictor</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
-</html>
-HTML
-
-# client/src/index.js
-cat > client/src/index.js <<'JS'
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import './styles.css';
-
-const container = document.getElementById('root');
-const root = createRoot(container);
-root.render(<App />);
-JS
-
-# client/src/api.js (mock fallback)
-cat > client/src/api.js <<'JS'
-const API_BASE = process.env.REACT_APP_API_URL || '';
-
-const mockPredictions = [
-  {
-    id: 'match-1',
-    date: new Date().toISOString().split('T')[0],
-    home: { name: 'Home FC 1', logo: 'https://via.placeholder.com/64?text=H1' },
-    away: { name: 'Away FC 1', logo: 'https://via.placeholder.com/64?text=A1' },
-    prediction: 'Home Win',
-    confidence: 72
-  },
-  {
-    id: 'match-2',
-    date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    home: { name: 'Home FC 2', logo: 'https://via.placeholder.com/64?text=H2' },
-    away: { name: 'Away FC 2', logo: 'https://via.placeholder.com/64?text=A2' },
-    prediction: 'Draw',
-    confidence: 54
-  },
-  {
-    id: 'match-3',
-    date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
-    home: { name: 'Home FC 3', logo: 'https://via.placeholder.com/64?text=H3' },
-    away: { name: 'Away FC 3', logo: 'https://via.placeholder.com/64?text=A3' },
-    prediction: 'Away Win',
-    confidence: 61
-  }
-];
-
-export async function fetchPredictions() {
-  if (!API_BASE) {
-    const today = new Date();
-    const out = [];
-    for (let i = 0; i < 7; i++) {
-      const idx = i % mockPredictions.length;
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      out.push({ ...mockPredictions[idx], id: `match-${i + 1}`, date: d.toISOString().split('T')[0] });
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Soccer Match Predictor — Next 7 Days</title>
+  <style>
+    :root{
+      --bg:#071028; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4; --text:#e6eef8;
     }
-    return out;
-  }
-
-  const res = await fetch(`${API_BASE}/api/predictions`);
-  if (!res.ok) throw new Error('Failed to fetch predictions from API');
-  const data = await res.json();
-  return data.predictions;
-}
-JS
-
-# client/src/App.js
-cat > client/src/App.js <<'JS'
-import React, { useEffect, useState } from 'react';
-import { fetchPredictions } from './api';
-import MatchCard from './components/MatchCard';
-
-export default function App() {
-  const [predictions, setPredictions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchPredictions()
-      .then(data => { if (mounted) setPredictions(data); })
-      .catch(e => { if (mounted) setError(e.message); })
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
-  }, []);
-
-  return (
-    <div className="app">
-      <header className="header">
-        <h1>Soccer Match Predictor — Next 7 Days</h1>
-      </header>
-
-      <main className="main">
-        {loading && <p>Loading predictions...</p>}
-        {error && <p className="error">Error: {error}</p>}
-        <div className="grid">
-          {predictions.map(p => (
-            <MatchCard key={p.id} match={p} />
-          ))}
-        </div>
-      </main>
-
-      <footer className="footer">
-        <small>Starter app. Replace placeholder data with a live fixtures API later.</small>
-      </footer>
-    </div>
-  );
-}
-JS
-
-# client/src/components/MatchCard.jsx
-cat > client/src/components/MatchCard.jsx <<'JS'
-import React from 'react';
-
-export default function MatchCard({ match }) {
-  return (
-    <div className="card">
-      <div className="date">{match.date}</div>
-
-      <div className="teams">
-        <div className="team">
-          <img src={match.home.logo} alt={match.home.name} className="logo" />
-          <div className="name">{match.home.name}</div>
-        </div>
-
-        <div className="vs">
-          <div className="prediction">{match.prediction}</div>
-          <div className="confidence">{match.confidence}%</div>
-        </div>
-
-        <div className="team">
-          <img src={match.away.logo} alt={match.away.name} className="logo" />
-          <div className="name">{match.away.name}</div>
-        </div>
+    html,body{height:100%;margin:0;font-family:Inter, Roboto, system-ui, -apple-system, "Segoe UI", Arial;background:linear-gradient(180deg,#071028 0%,#071830 100%);color:var(--text)}
+    .wrap{max-width:1100px;margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 12px}
+    h1{font-size:20px;margin:0;font-weight:700}
+    .sub{color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.12));border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .date{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .teams{display:flex;align-items:center;justify-content:space-between}
+    .team{display:flex;flex-direction:column;align-items:center;width:36%}
+    .logo{width:64px;height:64px;object-fit:cover;border-radius:8px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.04);background:#071022}
+    .name{font-size:14px;text-align:center}
+    .vs{width:28%;text-align:center;display:flex;flex-direction:column;align-items:center}
+    .prediction{font-weight:700;color:var(--accent);margin-bottom:6px}
+    .confidence{font-size:12px;color:var(--muted)}
+    footer{margin-top:20px;text-align:center;color:var(--muted);font-size:13px}
+    @media (max-width:420px){.teams{gap:8px}.logo{width:52px;height:52px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Soccer Match Predictor</h1>
+        <div class="sub">Mock predictions for the upcoming 7 days — static HTML demo</div>
       </div>
-    </div>
-  );
-}
-JS
+      <div class="sub" id="generatedAt"></div>
+    </header>
 
-# client/src/styles.css
-cat > client/src/styles.css <<'CSS'
-:root {
-  --bg: #0f172a;
-  --card: #0b1220;
-  --muted: #94a3b8;
-  --accent: #06b6d4;
-  --text: #e6eef8;
-}
+    <main>
+      <div class="grid" id="matchesGrid" aria-live="polite"></div>
+    </main>
 
-body {
-  margin: 0;
-  font-family: Inter, Roboto, system-ui, -apple-system, "Segoe UI", Arial;
-  background: linear-gradient(180deg, #071028 0%, #071830 100%);
-  color: var(--text);
-  min-height: 100vh;
-}
+    <footer>Starter static page. Replace mock data with your API and deploy to GitHub Pages.</footer>
+  </div>
 
-.header {
-  padding: 24px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
-}
+  <script>
+    // Mock templates used to create a 7-day set
+    const templates = [
+      {homeName: 'Home FC 1', awayName: 'Away FC 1', homeLogo: 'https://via.placeholder.com/64?text=H1', awayLogo: 'https://via.placeholder.com/64?text=A1', prediction: 'Home Win', confidence: 72},
+      {homeName: 'Home FC 2', awayName: 'Away FC 2', homeLogo: 'https://via.placeholder.com/64?text=H2', awayLogo: 'https://via.placeholder.com/64?text=A2', prediction: 'Draw', confidence: 54},
+      {homeName: 'Home FC 3', awayName: 'Away FC 3', homeLogo: 'https://via.placeholder.com/64?text=H3', awayLogo: 'https://via.placeholder.com/64?text=A3', prediction: 'Away Win', confidence: 61}
+    ];
 
-.main {
-  padding: 24px;
-  max-width: 1000px;
-  margin: 0 auto;
-}
+    function formatDate(d){
+      return d.toISOString().split('T')[0];
+    }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
+    function buildMatches(){
+      const grid = document.getElementById('matchesGrid');
+      grid.innerHTML = '';
+      const today = new Date();
+      for(let i=0;i<7;i++){
+        const t = templates[i % templates.length];
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="date">${formatDate(d)}</div>
+          <div class="teams">
+            <div class="team">
+              <img class="logo" src="${t.homeLogo}" alt="${t.homeName} logo">
+              <div class="name">${t.homeName}</div>
+            </div>
+            <div class="vs">
+              <div class="prediction">${t.prediction}</div>
+              <div class="confidence">${t.confidence}%</div>
+            </div>
+            <div class="team">
+              <img class="logo" src="${t.awayLogo}" alt="${t.awayName} logo">
+              <div class="name">${t.awayName}</div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      }
+      document.getElementById('generatedAt').textContent = 'Updated: ' + new Date().toLocaleString();
+    }
 
-.card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid rgba(255,255,255,0.04);
-  box-shadow: 0 6px 20px rgba(2,6,23,0.6);
-}
+    // Render on load
+    buildMatches();
 
-.date {
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-
-.teams {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.team {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 36%;
-}
-
-.logo {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  border: 1px solid rgba(255,255,255,0.04);
-}
-
-.name {
-  font-size: 14px;
-  text-align: center;
-}
-
-.vs {
-  width: 28%;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.prediction {
-  font-weight: 600;
-  color: var(--accent);
-  margin-bottom: 6px;
-}
-
-.confidence {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.footer {
-  text-align: center;
-  padding: 20px;
-  color: var(--muted);
-}
-CSS
-
-# GitHub Actions workflow for Pages (build & deploy)
-cat > .github/workflows/deploy.yml <<'YAML'
-name: Build and Deploy client to GitHub Pages
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        working-directory: client
-        run: npm ci
-
-      - name: Build client
-        working-directory: client
-        env:
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
-        run: npm run build
-
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./client/build
-          publish_branch: gh-pages
-YAML
-
-# Install dependencies for server and client
-echo
-echo "Installing server dependencies..."
-cd server
-npm install --no-audit --no-fund
-cd ..
-
-echo "Installing client dependencies..."
-cd client
-npm install --no-audit --no-fund
-cd ..
-
-# Build client
-echo "Building client..."
-cd client
-npm run build
-cd ..
-
-# Initialize git, commit and create ZIP
-git init -b main
-git add .
-git commit -m "Initial commit — soccer match predictor starter"
-
-cd ..
-echo "Creating ZIP archive: $ZIP_NAME"
-zip -r "$ZIP_NAME" "$ROOT_DIR" >/dev/null
-
-echo
-echo "Done."
-echo "Project folder: $(pwd)/$ROOT_DIR"
-echo "ZIP archive:   $(pwd)/$ZIP_NAME"
-echo
-echo "Next steps:"
-echo "1) Replace <your-github-username> in $ROOT_DIR/client/package.json with your GitHub username."
-echo "2) Create a GitHub repo named SoccerMatchPredictor and push the local repo:"
-echo "     cd $ROOT_DIR"
-echo "     git remote add origin https://github.com/<your-github-username>/SoccerMatchPredictor.git"
-echo "     git push -u origin main"
-echo "3) Open repository Settings > Pages to confirm gh-pages branch is set as source (Actions should create the branch automatically)."
+    // Simple refresh button via keyboard R to regenerate (useful while editing)
+    window.addEventListener('keydown', (e)=>{ if(e.key.toLowerCase()==='r'){ buildMatches(); } });
+  </script>
+</body>
+</html>
