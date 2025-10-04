@@ -8,7 +8,6 @@ on:
 jobs:
   update-fixtures:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -28,6 +27,6 @@ jobs:
       run: |
         git config --global user.name "github-actions"
         git config --global user.email "github-actions@github.com"
-        git add fixtures.js
-        git commit -m "Weekly update of match predictions"
+        git add fixtures.js index.html
+        git commit -m "Weekly update of match predictions and index"
         git push
