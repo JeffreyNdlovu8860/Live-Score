@@ -16,7 +16,7 @@
     </style>
     <script>
         async function fetchFixtures() {
-            const response = await fetch('https://api.mocki.io/v2/549a5d8b/EnglishFixtures'); // Replace with real API
+            const response = await fetch('./fixture.json'); // Replace with real API
             const data = await response.json();
             const container = document.getElementById('fixtures');
             container.innerHTML = '';
