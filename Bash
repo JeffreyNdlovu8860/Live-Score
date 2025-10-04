@@ -1,0 +1,6 @@
+git init
+git add .
+git commit -m "Frontend ready for GitHub Pages deploy"
+git branch -M main
+git remote add origin https://github.com/<your-github-username>/SoccerMatchPredictor.git
+git push -u origin main
