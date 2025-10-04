@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Soccer Match Predictor — Next 7 Days</title>
+  <style>
+    :root{
+      --bg:#071028; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4; --text:#e6eef8;
+    }
+    html,body{height:100%;margin:0;font-family:Inter, Roboto, system-ui, -apple-system, "Segoe UI", Arial;background:linear-gradient(180deg,#071028 0%,#071830 100%);color:var(--text)}
+    .wrap{max-width:1100px;margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 12px}
+    h1{font-size:20px;margin:0;font-weight:700}
+    .sub{color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.12));border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .date{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .teams{display:flex;align-items:center;justify-content:space-between}
+    .team{display:flex;flex-direction:column;align-items:center;width:36%}
+    .logo{width:64px;height:64px;object-fit:cover;border-radius:8px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.04);background:#071022}
+    .name{font-size:14px;text-align:center}
+    .vs{width:28%;text-align:center;display:flex;flex-direction:column;align-items:center}
+    .prediction{font-weight:700;color:var(--accent);margin-bottom:6px}
+    .confidence{font-size:12px;color:var(--muted)}
+    footer{margin-top:20px;text-align:center;color:var(--muted);font-size:13px}
+    @media (max-width:420px){.teams{gap:8px}.logo{width:52px;height:52px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Soccer Match Predictor</h1>
+        <div class="sub">Upcoming fixtures — auto-updated weekly</div>
+      </div>
+      <div class="sub" id="generatedAt"></div>
+    </header>
+
+    <main>
+      <div class="grid" id="matchesGrid" aria-live="polite"></div>
+    </main>
+
+    <footer>Powered by OpenFootball JSON data. Updated weekly via GitHub Actions.</footer>
+  </div>
+
+  <script src="fixtures.js"></script>
+  <script>
+    function formatDate(d){
+      return d.toISOString().split('T')[0];
+    }
+
+    function buildMatches(){
+      const grid = document.getElementById('matchesGrid');
+      grid.innerHTML = '';
+      fixtures.forEach(match => {
+        const d = new Date(match.date);
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="date">${formatDate(d)}</div>
+          <div class="teams">
+            <div class="team">
+              <img class="logo" src="https://via.placeholder.com/64?text=${match.team1}" alt="${match.team1} logo">
+              <div class="name">${match.team1}</div>
+            </div>
+            <div class="vs">
+              <div class="prediction">vs</div>
+              <div class="confidence">${match.time}</div>
+            </div>
+            <div class="team">
+              <img class="logo" src="https://via.placeholder.com/64?text=${match.team2}" alt="${match.team2} logo">
+              <div class="name">${match.team2}</div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+      document.getElementById('generatedAt').textContent = 'Updated: ' + new Date().toLocaleString();
+    }
+
+    buildMatches();
+  </script>
+</body>
+</html>
